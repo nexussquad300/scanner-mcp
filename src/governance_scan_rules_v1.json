@@ -1,0 +1,734 @@
+{
+  "metadata": {
+    "version": "1.0",
+    "source": "Warren (Ring 0, Systems Audit)",
+    "purpose": "Deterministic agent infrastructure governance scan rules",
+    "evaluation_method": "JSON/string inspection only, no LLM required",
+    "total_categories": 10,
+    "total_rules": 67,
+    "date_created": "2026-04-01",
+    "authority": "Warren governance audit protocol (v2.1 runsheet)"
+  },
+  "categories": [
+    {
+      "category_id": 1,
+      "category_name": "Identity & Charter",
+      "description": "Does the agent have a defined scope, name, role, and charter?",
+      "rules": [
+        {
+          "rule_id": "1.1",
+          "check": "Agent has unique name",
+          "field_path": "name",
+          "condition": "exists_and_non_empty",
+          "score_if_pass": 2,
+          "score_if_fail": 0,
+          "severity": "FAIL",
+          "finding_if_fail": "Agent name undefined or empty",
+          "recommendation": "Add 'name' field to agent configuration"
+        },
+        {
+          "rule_id": "1.2",
+          "check": "Agent has defined role/ring",
+          "field_path": "ring",
+          "condition": "exists_and_in_list",
+          "valid_values": ["Ring 0", "Ring 1", "Ring 2", "Ring 3"],
+          "score_if_pass": 2,
+          "score_if_fail": 0,
+          "severity": "FAIL",
+          "finding_if_fail": "Agent ring/role undefined",
+          "recommendation": "Define ring assignment (0=core, 1=platform, 2=strategy, 3=specialized)"
+        },
+        {
+          "rule_id": "1.3",
+          "check": "Agent has SOUL.md or charter file",
+          "field_path": "workspace",
+          "condition": "file_exists",
+          "file_path_pattern": "*/SOUL.md",
+          "score_if_pass": 3,
+          "score_if_fail": 1,
+          "severity": "HIGH",
+          "finding_if_fail": "Agent charter (SOUL.md) not found",
+          "recommendation": "Create SOUL.md in agent workspace with purpose, rules, authority scope"
+        },
+        {
+          "rule_id": "1.4",
+          "check": "Charter contains authority scope",
+          "field_path": "workspace/SOUL.md",
+          "condition": "file_contains",
+          "search_terms": ["Authority", "authority", "AUTHORITY"],
+          "score_if_pass": 2,
+          "score_if_fail": 0,
+          "severity": "MEDIUM",
+          "finding_if_fail": "Charter does not document authority boundaries",
+          "recommendation": "Add 'AUTHORITY' section to SOUL.md defining what agent can and cannot do"
+        },
+        {
+          "rule_id": "1.5",
+          "check": "Agent purpose is documented",
+          "field_path": "workspace/SOUL.md",
+          "condition": "file_contains",
+          "search_terms": ["Purpose", "purpose", "PURPOSE", "CORE PURPOSE"],
+          "score_if_pass": 1,
+          "score_if_fail": 0,
+          "severity": "LOW",
+          "finding_if_fail": "Agent purpose not documented",
+          "recommendation": "Document core purpose at top of SOUL.md"
+        }
+      ],
+      "max_score": 10,
+      "score_calculation": "sum of rule scores, capped at max_score"
+    },
+    {
+      "category_id": 2,
+      "category_name": "Model Assignment",
+      "description": "Is the agent assigned a valid LLM model with appropriate parameters?",
+      "rules": [
+        {
+          "rule_id": "2.1",
+          "check": "Agent has primary model assigned",
+          "field_path": "agents.defaults.model.primary",
+          "condition": "exists_and_non_empty",
+          "score_if_pass": 3,
+          "score_if_fail": 0,
+          "severity": "FAIL",
+          "finding_if_fail": "Agent has no primary model assigned",
+          "recommendation": "Assign primary model in openclaw.json (e.g., anthropic/claude-sonnet-4-5-20250929)"
+        },
+        {
+          "rule_id": "2.2",
+          "check": "Model is in supported list",
+          "field_path": "agents.defaults.model.primary",
+          "condition": "exists_and_in_list",
+          "valid_values": [
+            "anthropic/claude-sonnet-4-5-20250929",
+            "anthropic/claude-opus-4-1-20250805",
+            "anthropic/claude-opus-4-6",
+            "anthropic/claude-haiku-4-5-20251001",
+            "openai/gpt-4-turbo",
+            "google/gemini-2.0-flash"
+          ],
+          "score_if_pass": 2,
+          "score_if_fail": 0,
+          "severity": "HIGH",
+          "finding_if_fail": "Model not in supported provider list",
+          "recommendation": "Use approved model from openclaw.json models section"
+        },
+        {
+          "rule_id": "2.3",
+          "check": "Model has cache retention policy",
+          "field_path": "agents.defaults.models.[model].params.cacheRetention",
+          "condition": "exists_and_in_list",
+          "valid_values": ["short", "long"],
+          "score_if_pass": 2,
+          "score_if_fail": 1,
+          "severity": "MEDIUM",
+          "finding_if_fail": "Cache retention policy undefined",
+          "recommendation": "Set cacheRetention to 'long' for cost-efficient multi-session agents"
+        },
+        {
+          "rule_id": "2.4",
+          "check": "Ring 0 agents use minimal thinking",
+          "field_path": "agents.defaults.models.[model].params.thinking",
+          "condition": "ring_0_has_low_thinking",
+          "max_thinking_value": "low",
+          "score_if_pass": 2,
+          "score_if_fail": 1,
+          "severity": "MEDIUM",
+          "finding_if_fail": "Ring 0 agent has high thinking overhead",
+          "recommendation": "Set thinking='low' for Ring 0 auditing agents (Warren, Vale, Nexus)"
+        },
+        {
+          "rule_id": "2.5",
+          "check": "Model context window is sufficient",
+          "field_path": "agents.defaults.model.primary",
+          "condition": "model_context_200k",
+          "score_if_pass": 1,
+          "score_if_fail": 0,
+          "severity": "LOW",
+          "finding_if_fail": "Model context window may be insufficient (< 200K)",
+          "recommendation": "Consider upgrading to model with 200K+ context window for long governance sessions"
+        }
+      ],
+      "max_score": 10,
+      "score_calculation": "sum of rule scores, capped at max_score"
+    },
+    {
+      "category_id": 3,
+      "category_name": "Permission Boundaries",
+      "description": "Are tool permissions correctly scoped per agent role?",
+      "rules": [
+        {
+          "rule_id": "3.1",
+          "check": "Agent sandbox mode defined",
+          "field_path": "agents.[agent_name].sandbox",
+          "condition": "exists_and_in_list",
+          "valid_values": ["inherit", "require"],
+          "score_if_pass": 3,
+          "score_if_fail": 0,
+          "severity": "FAIL",
+          "finding_if_fail": "Sandbox mode not defined",
+          "recommendation": "Set sandbox to 'inherit' (for main sessions) or 'require' (for isolated crons)"
+        },
+        {
+          "rule_id": "3.2",
+          "check": "Elevated tools disabled by default",
+          "field_path": "elevated.enabled",
+          "condition": "equals_false",
+          "score_if_pass": 3,
+          "score_if_fail": 0,
+          "severity": "CRITICAL",
+          "finding_if_fail": "Elevated tools (exec, shell, code) globally enabled",
+          "recommendation": "Set elevated.enabled = false in openclaw.json (default deny)"
+        },
+        {
+          "rule_id": "3.3",
+          "check": "Agent-to-agent auth enabled",
+          "field_path": "agentToAgent.enabled",
+          "condition": "equals_true",
+          "score_if_pass": 2,
+          "score_if_fail": 0,
+          "severity": "HIGH",
+          "finding_if_fail": "Agent-to-agent routing disabled",
+          "recommendation": "Enable agentToAgent.enabled = true for multi-agent coordination"
+        },
+        {
+          "rule_id": "3.4",
+          "check": "Tool deny list is non-empty",
+          "field_path": "tools.deny",
+          "condition": "exists_and_non_empty",
+          "score_if_pass": 2,
+          "score_if_fail": 1,
+          "severity": "MEDIUM",
+          "finding_if_fail": "No default tool deny list",
+          "recommendation": "Add tools.deny = ['group:runtime', 'group:ui'] at minimum"
+        },
+        {
+          "rule_id": "3.5",
+          "check": "Ring boundaries respected",
+          "field_path": "ring",
+          "condition": "tool_access_matches_ring",
+          "ring_0_tools": ["sessions_list", "sessions_history", "memory_search", "message"],
+          "ring_1_tools": ["read", "write", "edit", "web_search"],
+          "ring_2_tools": ["web_fetch", "pdf"],
+          "ring_3_tools": ["image_generate", "tts"],
+          "score_if_pass": 2,
+          "score_if_fail": 0,
+          "severity": "MEDIUM",
+          "finding_if_fail": "Agent tool access violates ring boundaries",
+          "recommendation": "Verify agent tools match ring assignment"
+        }
+      ],
+      "max_score": 10,
+      "score_calculation": "sum of rule scores, capped at max_score"
+    },
+    {
+      "category_id": 4,
+      "category_name": "Cost Controls",
+      "description": "Are token spend limits and cost tracking in place?",
+      "rules": [
+        {
+          "rule_id": "4.1",
+          "check": "Cost Governance Addendum acknowledged",
+          "field_path": "workspace/MEMORY.md",
+          "condition": "file_contains",
+          "search_terms": ["COR-COST-001", "Cost Governance Addendum"],
+          "score_if_pass": 2,
+          "score_if_fail": 0,
+          "severity": "HIGH",
+          "finding_if_fail": "Cost governance rules not referenced in agent memory",
+          "recommendation": "Add COR-COST-001 reference to agent MEMORY.md"
+        },
+        {
+          "rule_id": "4.2",
+          "check": "Max retries rule enforced (Rule 1)",
+          "field_path": "workspace/SOUL.md",
+          "condition": "file_contains",
+          "search_terms": ["max 3 retries", "retry limit", "max_retries"],
+          "score_if_pass": 2,
+          "score_if_fail": 1,
+          "severity": "HIGH",
+          "finding_if_fail": "Max retries rule not documented",
+          "recommendation": "Add Rule 1 (max 3 retries per task) to SOUL.md"
+        },
+        {
+          "rule_id": "4.3",
+          "check": "25K token halt rule documented",
+          "field_path": "workspace/SOUL.md",
+          "condition": "file_contains",
+          "search_terms": ["25K tokens", "token halt", "RULE 5"],
+          "score_if_pass": 2,
+          "score_if_fail": 1,
+          "severity": "HIGH",
+          "finding_if_fail": "25K token halt rule not documented",
+          "recommendation": "Add Rule 5 (25K token halt) to SOUL.md"
+        },
+        {
+          "rule_id": "4.4",
+          "check": "Cost Governance Addendum v1.1 is current",
+          "field_path": "workspace/MEMORY.md",
+          "condition": "file_contains",
+          "search_terms": ["v1.1", "Rule 5B", "payload size cap"],
+          "score_if_pass": 2,
+          "score_if_fail": 0,
+          "severity": "MEDIUM",
+          "finding_if_fail": "Cost Governance using old version (< v1.1)",
+          "recommendation": "Update to Cost Governance Addendum v1.1 (includes Rule 5B payload cap)"
+        },
+        {
+          "rule_id": "4.5",
+          "check": "No autonomous recursive fixing rule",
+          "field_path": "workspace/SOUL.md",
+          "condition": "file_contains",
+          "search_terms": ["no recursive", "Rule 4", "spawn", "sub-agent"],
+          "score_if_pass": 1,
+          "score_if_fail": 0,
+          "severity": "MEDIUM",
+          "finding_if_fail": "No explicit prohibition on recursive sub-agent spawning",
+          "recommendation": "Add Rule 4 (no autonomous recursive fixing) to SOUL.md"
+        }
+      ],
+      "max_score": 10,
+      "score_calculation": "sum of rule scores, capped at max_score"
+    },
+    {
+      "category_id": 5,
+      "category_name": "Escalation Paths",
+      "description": "Can the agent escalate issues to Warren and Rich?",
+      "rules": [
+        {
+          "rule_id": "5.1",
+          "check": "Agent knows Warren's session",
+          "field_path": "workspace/MEMORY.md",
+          "condition": "file_contains",
+          "search_terms": ["agent:warren:main", "Warren session"],
+          "score_if_pass": 2,
+          "score_if_fail": 0,
+          "severity": "HIGH",
+          "finding_if_fail": "No reference to Warren escalation path",
+          "recommendation": "Add Warren's session ID (agent:warren:main) to agent MEMORY.md"
+        },
+        {
+          "rule_id": "5.2",
+          "check": "Escalation format documented",
+          "field_path": "workspace/SOUL.md",
+          "condition": "file_contains",
+          "search_terms": ["ESCALATE:", "severity", "ref:"],
+          "score_if_pass": 2,
+          "score_if_fail": 0,
+          "severity": "HIGH",
+          "finding_if_fail": "Escalation format (ESCALATE: severity | summary | action: | ref:) not documented",
+          "recommendation": "Add escalation contract format to SOUL.md"
+        },
+        {
+          "rule_id": "5.3",
+          "check": "Telegram delivery to Rich configured",
+          "field_path": "openclaw.json",
+          "condition": "rich_telegram_configured",
+          "rich_sender_id": "1411569760",
+          "score_if_pass": 2,
+          "score_if_fail": 0,
+          "severity": "HIGH",
+          "finding_if_fail": "No Telegram route to Rich configured",
+          "recommendation": "Verify warren_bot can send to telegram:1411569760"
+        },
+        {
+          "rule_id": "5.4",
+          "check": "Failure escalation is documented",
+          "field_path": "workspace/SOUL.md",
+          "condition": "file_contains",
+          "search_terms": ["escalate failures", "COR-NEXUS-002", "heartbeat"],
+          "score_if_pass": 2,
+          "score_if_fail": 1,
+          "severity": "MEDIUM",
+          "finding_if_fail": "No explicit rule to escalate task failures",
+          "recommendation": "Document COR-NEXUS-002 (heartbeat integrity): never report OK if task failed"
+        },
+        {
+          "rule_id": "5.5",
+          "check": "SLA for escalation documented",
+          "field_path": "workspace/MEMORY.md",
+          "condition": "file_contains",
+          "search_terms": ["CRITICAL", "1 hour", "4 hours", "24 hours", "SLA"],
+          "score_if_pass": 1,
+          "score_if_fail": 0,
+          "severity": "LOW",
+          "finding_if_fail": "No escalation SLA documented",
+          "recommendation": "Add escalation SLA (CRITICAL: 1h, HIGH: 6h, MEDIUM: 24h, LOW: next cycle)"
+        }
+      ],
+      "max_score": 10,
+      "score_calculation": "sum of rule scores, capped at max_score"
+    },
+    {
+      "category_id": 6,
+      "category_name": "Audit Trail",
+      "description": "Are agent actions logged and auditable?",
+      "rules": [
+        {
+          "rule_id": "6.1",
+          "check": "Agent has daily memory file",
+          "field_path": "workspace/memory/YYYY-MM-DD.md",
+          "condition": "file_exists_pattern",
+          "score_if_pass": 2,
+          "score_if_fail": 0,
+          "severity": "HIGH",
+          "finding_if_fail": "No daily memory file created",
+          "recommendation": "Create memory/YYYY-MM-DD.md for session-by-session audit trail"
+        },
+        {
+          "rule_id": "6.2",
+          "check": "Long-term memory maintained",
+          "field_path": "workspace/MEMORY.md",
+          "condition": "file_exists_and_recent",
+          "max_age_days": 30,
+          "score_if_pass": 2,
+          "score_if_fail": 0,
+          "severity": "HIGH",
+          "finding_if_fail": "MEMORY.md missing or not updated in 30+ days",
+          "recommendation": "Maintain MEMORY.md with significant decisions, lessons, assumptions"
+        },
+        {
+          "rule_id": "6.3",
+          "check": "Decisions logged with attribution",
+          "field_path": "workspace/memory/YYYY-MM-DD.md",
+          "condition": "file_contains",
+          "search_terms": ["Decision:", "Source:"],
+          "score_if_pass": 2,
+          "score_if_fail": 1,
+          "severity": "MEDIUM",
+          "finding_if_fail": "Decisions not logged with source attribution",
+          "recommendation": "Log all decisions with Source: field (path|cmd|chatref)"
+        },
+        {
+          "rule_id": "6.4",
+          "check": "Session history is preserved",
+          "field_path": "agents/[agent_name]/sessions/*.jsonl",
+          "condition": "file_exists_and_readable",
+          "score_if_pass": 2,
+          "score_if_fail": 0,
+          "severity": "MEDIUM",
+          "finding_if_fail": "Session transcripts not preserved",
+          "recommendation": "Ensure session logs are retained in agents/[agent]/sessions/"
+        },
+        {
+          "rule_id": "6.5",
+          "check": "COR ledger referenced",
+          "field_path": "workspace/MEMORY.md",
+          "condition": "file_contains",
+          "search_terms": ["COR-", "correction", "binding rule"],
+          "score_if_pass": 1,
+          "score_if_fail": 0,
+          "severity": "LOW",
+          "finding_if_fail": "No COR (correction record) ledger maintained",
+          "recommendation": "Document all binding rules as COR-XXX-YYY entries in MEMORY.md"
+        }
+      ],
+      "max_score": 10,
+      "score_calculation": "sum of rule scores, capped at max_score"
+    },
+    {
+      "category_id": 7,
+      "category_name": "Data Handling",
+      "description": "Does the agent handle secrets and sensitive data securely?",
+      "rules": [
+        {
+          "rule_id": "7.1",
+          "check": "No secrets in workspace files",
+          "field_path": "workspace",
+          "condition": "no_api_keys_in_files",
+          "forbidden_patterns": ["api_key=", "PRIVATE_KEY=", "TOKEN=", "secret="],
+          "score_if_pass": 3,
+          "score_if_fail": 0,
+          "severity": "CRITICAL",
+          "finding_if_fail": "API keys or secrets found in workspace files",
+          "recommendation": "Move all secrets to ~/.openclaw/ (system root), never check into workspace"
+        },
+        {
+          "rule_id": "7.2",
+          "check": "Auth profiles configured at system root",
+          "field_path": "openclaw.json/auth",
+          "condition": "auth_profiles_exist",
+          "required_profiles": ["anthropic:default", "openai:manual"],
+          "score_if_pass": 2,
+          "score_if_fail": 0,
+          "severity": "HIGH",
+          "finding_if_fail": "No auth profiles configured at system root",
+          "recommendation": "Configure auth profiles in ~/.openclaw/openclaw.json"
+        },
+        {
+          "rule_id": "7.3",
+          "check": "No personal data exfiltration",
+          "field_path": "workspace/MEMORY.md",
+          "condition": "file_contains",
+          "search_terms": ["Do not exfiltrate", "private data", "never share"],
+          "score_if_pass": 1,
+          "score_if_fail": 1,
+          "severity": "MEDIUM",
+          "finding_if_fail": "Data handling policy not documented",
+          "recommendation": "Document: 'Do not exfiltrate private data. Ever.' in SOUL.md"
+        },
+        {
+          "rule_id": "7.4",
+          "check": "DCL boundaries respected",
+          "field_path": "workspace/MEMORY.md",
+          "condition": "file_contains",
+          "search_terms": ["DCL-ROOT-001", "GoogleDrive", "canonical"],
+          "score_if_pass": 2,
+          "score_if_fail": 0,
+          "severity": "HIGH",
+          "finding_if_fail": "Document Control Library (DCL) boundaries not documented",
+          "recommendation": "Reference DCL-ROOT-001 binding rule (canonical DOCROOT immutable)"
+        },
+        {
+          "rule_id": "7.5",
+          "check": "Protected files registry exists",
+          "field_path": "workspace/PROTECTED_FILES.md",
+          "condition": "file_exists",
+          "score_if_pass": 1,
+          "score_if_fail": 0,
+          "severity": "LOW",
+          "finding_if_fail": "No protected files registry",
+          "recommendation": "Create PROTECTED_FILES.md listing audit-critical files with SHA256 hashes"
+        }
+      ],
+      "max_score": 10,
+      "score_calculation": "sum of rule scores, capped at max_score"
+    },
+    {
+      "category_id": 8,
+      "category_name": "Failure Modes",
+      "description": "Are failure scenarios documented and handled?",
+      "rules": [
+        {
+          "rule_id": "8.1",
+          "check": "Agent has error handling policy",
+          "field_path": "workspace/SOUL.md",
+          "condition": "file_contains",
+          "search_terms": ["ERROR HANDLING", "error", "exception", "failure"],
+          "score_if_pass": 2,
+          "score_if_fail": 0,
+          "severity": "HIGH",
+          "finding_if_fail": "No error handling policy documented",
+          "recommendation": "Add ERROR HANDLING section to SOUL.md"
+        },
+        {
+          "rule_id": "8.2",
+          "check": "Silent failures are prevented",
+          "field_path": "workspace/SOUL.md",
+          "condition": "file_contains",
+          "search_terms": ["COR-NEXUS-002", "never silent", "must escalate"],
+          "score_if_pass": 2,
+          "score_if_fail": 1,
+          "severity": "CRITICAL",
+          "finding_if_fail": "No rule preventing silent failures",
+          "recommendation": "Add COR-NEXUS-002 (Heartbeat Integrity): failures must escalate, never silent"
+        },
+        {
+          "rule_id": "8.3",
+          "check": "Runaway tasks have timeout",
+          "field_path": "workspace/SOUL.md",
+          "condition": "file_contains",
+          "search_terms": ["timeout", "runaway", "max execution"],
+          "score_if_pass": 2,
+          "score_if_fail": 1,
+          "severity": "HIGH",
+          "finding_if_fail": "No timeout/runaway task policy",
+          "recommendation": "Add rule: tasks must halt if execution time exceeds threshold"
+        },
+        {
+          "rule_id": "8.4",
+          "check": "Cascading failure prevention",
+          "field_path": "workspace/SOUL.md",
+          "condition": "file_contains",
+          "search_terms": ["isolation", "breach", "no cascade"],
+          "score_if_pass": 1,
+          "score_if_fail": 0,
+          "severity": "MEDIUM",
+          "finding_if_fail": "No cascading failure prevention documented",
+          "recommendation": "Document: agent failures should not cascade to other agents"
+        },
+        {
+          "rule_id": "8.5",
+          "check": "Recovery procedures documented",
+          "field_path": "workspace/MEMORY.md",
+          "condition": "file_contains",
+          "search_terms": ["recovery", "fallback", "backup plan"],
+          "score_if_pass": 1,
+          "score_if_fail": 0,
+          "severity": "LOW",
+          "finding_if_fail": "No recovery procedures documented",
+          "recommendation": "Document fallback procedures for common failure modes"
+        }
+      ],
+      "max_score": 10,
+      "score_calculation": "sum of rule scores, capped at max_score"
+    },
+    {
+      "category_id": 9,
+      "category_name": "Runtime Guardrails",
+      "description": "Are execution limits and guardrails in place?",
+      "rules": [
+        {
+          "rule_id": "9.1",
+          "check": "Agent has max execution time limit",
+          "field_path": "workspace/SOUL.md",
+          "condition": "file_contains",
+          "search_terms": ["max execution", "timeout", "halt after"],
+          "score_if_pass": 2,
+          "score_if_fail": 0,
+          "severity": "HIGH",
+          "finding_if_fail": "No max execution time documented",
+          "recommendation": "Document max execution time per session (e.g., 1 hour, 8 hours)"
+        },
+        {
+          "rule_id": "9.2",
+          "check": "Agent respects token budget",
+          "field_path": "workspace/SOUL.md",
+          "condition": "file_contains",
+          "search_terms": ["token budget", "25K tokens", "context limit"],
+          "score_if_pass": 2,
+          "score_if_fail": 1,
+          "severity": "HIGH",
+          "finding_if_fail": "No token budget or context limit documented",
+          "recommendation": "Add rule: halt if exceeding token budget (e.g., 25K per task)"
+        },
+        {
+          "rule_id": "9.3",
+          "check": "Heartbeat/keepalive implemented",
+          "field_path": "workspace/HEARTBEAT.md",
+          "condition": "file_exists_or_empty",
+          "score_if_pass": 2,
+          "score_if_fail": 1,
+          "severity": "MEDIUM",
+          "finding_if_fail": "No heartbeat/monitoring mechanism",
+          "recommendation": "Create HEARTBEAT.md with periodic check tasks or keep empty if no checks needed"
+        },
+        {
+          "rule_id": "9.4",
+          "check": "Sandbox/isolation enforced",
+          "field_path": "openclaw.json",
+          "condition": "agent_sandbox_set",
+          "score_if_pass": 2,
+          "score_if_fail": 0,
+          "severity": "HIGH",
+          "finding_if_fail": "Agent sandbox mode not enforced",
+          "recommendation": "Set sandbox = 'require' for isolated crons or 'inherit' for main sessions"
+        },
+        {
+          "rule_id": "9.5",
+          "check": "Rate limiting configured",
+          "field_path": "workspace/SOUL.md",
+          "condition": "file_contains",
+          "search_terms": ["rate limit", "cooldown", "max requests"],
+          "score_if_pass": 1,
+          "score_if_fail": 0,
+          "severity": "MEDIUM",
+          "finding_if_fail": "No rate limiting documented",
+          "recommendation": "Add rate limiting rules (e.g., max N requests per minute)"
+        }
+      ],
+      "max_score": 10,
+      "score_calculation": "sum of rule scores, capped at max_score"
+    },
+    {
+      "category_id": 10,
+      "category_name": "Governance Documentation",
+      "description": "Is governance comprehensive and up-to-date?",
+      "rules": [
+        {
+          "rule_id": "10.1",
+          "check": "Agent has SOUL.md (charter)",
+          "field_path": "workspace/SOUL.md",
+          "condition": "file_exists_and_recent",
+          "max_age_days": 90,
+          "score_if_pass": 2,
+          "score_if_fail": 0,
+          "severity": "CRITICAL",
+          "finding_if_fail": "SOUL.md missing or not updated in 90+ days",
+          "recommendation": "Ensure SOUL.md is complete and current"
+        },
+        {
+          "rule_id": "10.2",
+          "check": "Agent has MEMORY.md (long-term context)",
+          "field_path": "workspace/MEMORY.md",
+          "condition": "file_exists_and_recent",
+          "max_age_days": 30,
+          "score_if_pass": 2,
+          "score_if_fail": 0,
+          "severity": "HIGH",
+          "finding_if_fail": "MEMORY.md missing or not updated in 30+ days",
+          "recommendation": "Maintain MEMORY.md with significant decisions and lessons"
+        },
+        {
+          "rule_id": "10.3",
+          "check": "Agent has USER.md (if coordinating with Rich)",
+          "field_path": "workspace/USER.md",
+          "condition": "file_exists",
+          "applies_to_ring": ["Ring 0"],
+          "score_if_pass": 2,
+          "score_if_fail": 0,
+          "severity": "HIGH",
+          "finding_if_fail": "USER.md missing (required for Ring 0 agents)",
+          "recommendation": "Create USER.md with Rich's preferences, communication style, priorities"
+        },
+        {
+          "rule_id": "10.4",
+          "check": "Agent AGENTS.md exists",
+          "field_path": "workspace/AGENTS.md",
+          "condition": "file_exists",
+          "score_if_pass": 1,
+          "score_if_fail": 0,
+          "severity": "LOW",
+          "finding_if_fail": "AGENTS.md (workspace bootstrap) missing",
+          "recommendation": "Keep AGENTS.md as reference for workspace structure and agent bootstrap"
+        },
+        {
+          "rule_id": "10.5",
+          "check": "Governance version tracked",
+          "field_path": "workspace/MEMORY.md",
+          "condition": "file_contains",
+          "search_terms": ["Governance Version", "v1.", "Last Updated"],
+          "score_if_pass": 1,
+          "score_if_fail": 0,
+          "severity": "LOW",
+          "finding_if_fail": "Governance version not tracked",
+          "recommendation": "Add version and last-updated date to MEMORY.md header"
+        },
+        {
+          "rule_id": "10.6",
+          "check": "Rich's governance runsheet referenced",
+          "field_path": "workspace/MEMORY.md",
+          "condition": "file_contains",
+          "search_terms": ["warren-governance-report.md", "v2.1", "runsheet"],
+          "score_if_pass": 2,
+          "score_if_fail": 0,
+          "severity": "MEDIUM",
+          "finding_if_fail": "Canonical governance runsheet not referenced",
+          "recommendation": "Reference ~/.openclaw/workspace/shared/runsheets/warren-governance-report.md (v2.1)"
+        }
+      ],
+      "max_score": 10,
+      "score_calculation": "sum of rule scores, capped at max_score"
+    }
+  ],
+  "scoring": {
+    "total_possible_score": 100,
+    "passing_threshold": 70,
+    "degraded_threshold": 50,
+    "failing_threshold": 0,
+    "interpretation": {
+      "70_100": "Agent governance is HEALTHY — all critical rules pass",
+      "50_69": "Agent governance is DEGRADED — critical rules fail, requires intervention",
+      "0_49": "Agent governance is FAILING — multiple critical violations, escalate immediately"
+    }
+  },
+  "implementation_notes": {
+    "evaluation_method": "Deterministic JSON/string inspection only. No LLM reasoning required.",
+    "automation_target": "Smith can implement as automated rules engine (scan, score, report)",
+    "false_positive_prevention": "Rules are conservative; pass only if evidence is explicit",
+    "false_negative_prevention": "Each rule has low weight (0–3 points); multiple rules per category catch nuances",
+    "extensibility": "Smith can add rules in v1.1 (current version is minimal viable set)",
+    "authority": "Warren (Ring 0, Systems Audit) + Rich (founder approval)",
+    "deployment": "Target for Agent Infrastructure Moonshot Phase 1 deterministic scan engine"
+  }
+}

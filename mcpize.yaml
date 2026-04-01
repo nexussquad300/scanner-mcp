@@ -1,0 +1,5 @@
+name: scanner-mcp
+version: 1
+description: Agent infrastructure governance scanner - deterministic rule-based MCP server
+runtime: typescript
+entry: build/index.js

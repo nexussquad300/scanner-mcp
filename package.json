@@ -1,0 +1,23 @@
+{
+  "name": "scanner-mcp",
+  "version": "1.0.0",
+  "description": "Agent infrastructure governance scanner — deterministic rule-based MCP server",
+  "type": "module",
+  "main": "build/index.js",
+  "bin": "build/index.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "build": "tsc && cp src/governance_scan_rules_v1.json build/",
+    "dev": "mcpize dev",
+    "deploy": "mcpize deploy"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "typescript": "^5.8.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0"
+  }
+}
