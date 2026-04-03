@@ -811,7 +811,8 @@ function getGovernanceChecklist(agentType: string) {
 
 // ━━━ MCP Server ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-export const server = new Server(
+export function createServer() {
+const server = new Server(
   { name: "scanner-mcp", version: "1.0.0" },
   { capabilities: { tools: {} } }
 );
@@ -1000,9 +1001,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 });
 
+  return server;
+}
 // ━━━ Start ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 export async function main() {
+  const server = createServer();
   const port = process.argv.includes("--http") ? (process.env.PORT || "3000") : null;
 
   if (port) {
