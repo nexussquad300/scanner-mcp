@@ -39,9 +39,9 @@ export default {
           description: "Agent Governance Scanner — Deterministic governance scanning for AI agent configurations. 51 rules across 10 categories.",
           version: "1.0.0",
           tools: [
-            { name: "governance_scan", description: "Run a full governance scan against an agent configuration" },
-            { name: "governance_categories", description: "List all governance scan categories and rule counts" },
-            { name: "governance_rules", description: "List all governance rules with details" }
+            { name: "scan_agent_config", description: "Scan a single agent configuration against governance rules" },
+            { name: "scan_multi_agent_system", description: "Scan multiple agent configs with cross-agent risk analysis" },
+            { name: "get_governance_checklist", description: "Get best-practice governance checklist for an agent type" }
           ],
           connection: {
             type: "streamable-http",
@@ -54,34 +54,45 @@ export default {
 
     // MCP endpoint
     if (url.pathname === "/mcp" || url.pathname === "/") {
-      const transport = new WebStandardStreamableHTTPServerTransport({
-        sessionIdGenerator: undefined as any,
-        enableJsonResponse: true,
-      });
+      try {
+        const transport = new WebStandardStreamableHTTPServerTransport({
+          sessionIdGenerator: undefined as any,
+          enableJsonResponse: true,
+        });
 
-      const server = createServer();
-      await server.connect(transport);
+        const server = createServer();
+        await server.connect(transport);
 
-      // Ensure Accept header (Smithery scanner fix)
-      const headers = new Headers(request.headers);
-      if (!headers.get("Accept")?.includes("text/event-stream")) {
-        headers.set("Accept", "application/json, text/event-stream");
+        // Ensure Accept header (Smithery scanner fix)
+        const headers = new Headers(request.headers);
+        if (!headers.get("Accept")?.includes("text/event-stream")) {
+          headers.set("Accept", "application/json, text/event-stream");
+        }
+        const patchedRequest = new Request(request.url, {
+          method: request.method,
+          headers,
+          body: request.body,
+          duplex: "half",
+        } as any);
+
+        const response = await transport.handleRequest(patchedRequest);
+        const newHeaders = new Headers(response.headers);
+        for (const [k, v] of Object.entries(corsHeaders())) newHeaders.set(k, v);
+        return new Response(response.body, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: newHeaders,
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Internal server error";
+        return new Response(
+          JSON.stringify({ error: message }),
+          {
+            status: 500,
+            headers: { ...corsHeaders(), "Content-Type": "application/json" },
+          }
+        );
       }
-      const patchedRequest = new Request(request.url, {
-        method: request.method,
-        headers,
-        body: request.body,
-        duplex: "half",
-      } as any);
-
-      const response = await transport.handleRequest(patchedRequest);
-      const newHeaders = new Headers(response.headers);
-      for (const [k, v] of Object.entries(corsHeaders())) newHeaders.set(k, v);
-      return new Response(response.body, {
-        status: response.status,
-        statusText: response.statusText,
-        headers: newHeaders,
-      });
     }
 
     return new Response("Not found", { status: 404 });
