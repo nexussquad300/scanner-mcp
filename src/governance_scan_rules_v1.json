@@ -5,7 +5,7 @@
     "purpose": "Deterministic agent infrastructure governance scan rules",
     "evaluation_method": "JSON/string inspection only, no LLM required",
     "total_categories": 10,
-    "total_rules": 67,
+    "total_rules": 51,
     "date_created": "2026-04-01",
     "authority": "Warren governance audit protocol (v2.1 runsheet)"
   },

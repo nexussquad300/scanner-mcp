@@ -822,7 +822,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: "scan_agent_config",
       description:
-        "Scan a single agent configuration against 67 governance rules across 10 categories. Returns scored report with letter grade, findings, and recommendations.",
+        "Scan a single agent configuration against 51 governance rules across 10 categories. Returns scored report with letter grade, findings, and recommendations.",
       inputSchema: {
         type: "object" as const,
         properties: {
@@ -845,7 +845,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           agents: {
             type: "array",
             items: { type: "object" },
-            description: "Array of agent config objects",
+            description: "Array of agent config objects (max 20)",
+            maxItems: 20,
           },
           orchestration: {
             type: "object",
@@ -929,6 +930,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             isError: true,
           };
         }
+        if (args.agents.length > 20) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: JSON.stringify({
+                  error: "Maximum 20 agents per scan. Got: " + args.agents.length,
+                }),
+              },
+            ],
+            isError: true,
+          };
+        }
         return {
           content: [
             {
@@ -1006,17 +1020,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 // ━━━ Start ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 export async function main() {
-  const server = createServer();
   const port = process.argv.includes("--http") ? (process.env.PORT || "3000") : null;
 
   if (port) {
     // HTTP mode for mcpize dev / mcpize deploy
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined, // stateless
-    });
-    await server.connect(transport);
-
-    const httpServer = http.createServer((req, res) => {
+    const httpServer = http.createServer(async (req, res) => {
       if (req.method === "OPTIONS") {
         res.writeHead(204, {
           "Access-Control-Allow-Origin": "*",
@@ -1034,6 +1042,12 @@ export async function main() {
         return;
       }
       if (url.pathname === "/mcp" || url.pathname === "/") {
+        // Fresh transport + server per request (stateless pattern)
+        const transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: undefined,
+        });
+        const srv = createServer();
+        await srv.connect(transport);
         transport.handleRequest(req, res);
       } else {
         res.writeHead(404);
@@ -1045,7 +1059,8 @@ export async function main() {
       console.error(`Scanner MCP server running on http://0.0.0.0:${port}/mcp`);
     });
   } else {
-    // Stdio mode for local MCP clients
+    // Stdio mode for local MCP clients (single transport is fine for stdio)
+    const server = createServer();
     const transport = new StdioServerTransport();
     await server.connect(transport);
     console.error("Scanner MCP server running on stdio");
